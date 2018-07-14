@@ -178,11 +178,12 @@
     // 将选中线条移动到该按钮下面
     [UIView animateWithDuration:self.config.lineAnimationEnable?0.2:0 animations:^{
         CGRect frame = self.selectedLineView.frame;
-        frame.origin.x = sender.frame.origin.x;
         if (self.config.lineWidth > 0) {
             frame.size.width = self.config.lineWidth;
+            frame.origin.x = sender.center.x - self.config.lineWidth * 0.5;
         } else {
             frame.size.width = sender.frame.size.width;
+            frame.origin.x = sender.frame.origin.x;
         }
         self.selectedLineView.frame = frame;
     } completion:^(BOOL finished) {
