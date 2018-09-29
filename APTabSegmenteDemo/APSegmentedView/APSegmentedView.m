@@ -7,7 +7,12 @@
 //
 
 #import "APSegmentedView.h"
+
+#if __has_include(<NSObject+FBKVOController.h>)
+#import <NSObject+FBKVOController.h>
+#else
 #import "NSObject+FBKVOController.h"
+#endif
 
 #define scrollPadding       0       ///<scrollView的左右补边
 
@@ -20,14 +25,31 @@
     config.normalColor = [UIColor grayColor];
     config.selectedColor = [UIColor blackColor];
     config.btnWidth = 0;
-    config.btnHeight = 37.0f;
+    config.btnHeight = 38.0f;
     config.btnInterSpace = 34.0f;
     config.lineWidth = 0;
     config.lineHeight = 2.0f;
     config.lineColor = [UIColor redColor];
     config.lineAnimationEnable = YES;
     config.lineAnimationType = APSegmentedViewLineAnimationTypeFlexible;
+    config.positionType = APSegmentedViewPositionTypeCenter;
     return config;
+}
+
+@end
+
+@interface APSegmentedButton : UIButton
+//@property (nonatomic, weak) id<APSegmentedButton>
+@end
+
+@implementation APSegmentedButton
+
+- (void)setTitle:(NSString *)title forState:(UIControlState)state {
+    NSString *oldTitle = [self titleForState:state];
+    [super setTitle:title forState:state];
+    if (oldTitle.length) {
+        [self sendActionsForControlEvents:(UIControlEventValueChanged)];
+    }
 }
 
 @end
@@ -56,9 +78,11 @@
         NSMutableArray *btnArray = [NSMutableArray arrayWithCapacity:tabs.count];
         int i = 0;
         for (NSString *title in tabs) {
-            UIButton *button = [[UIButton alloc] init];
+            UIButton *button = [[APSegmentedButton alloc] init];
+            [button addTarget:self action:@selector(_buttonValueChanged:) forControlEvents:(UIControlEventValueChanged)];
             [button setTitleColor:config.normalColor forState:UIControlStateNormal];
-            [button setTitleColor:config.selectedColor forState:UIControlStateSelected | UIControlStateDisabled];
+            //            [button setTitleColor:config.selectedColor forState:UIControlStateSelected | UIControlStateDisabled];
+            [button setTitleColor:config.selectedColor forState:UIControlStateSelected];
             if (i == 0) {
                 button.titleLabel.font = config.selectedFont;
             } else {
@@ -75,7 +99,6 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             [self layout];
         });
-        
     }
     return self;
 }
@@ -88,8 +111,38 @@
     return self.bounds.size;
 }
 
-- (CGSize)sizeThatFits:(CGSize)size {
-    return self.bounds.size;
+- (void)sizeToFit {
+    CGSize size = CGSizeZero;
+    
+    CGFloat totalWidth = 0;
+    CGFloat height = self.config.btnHeight;
+    
+    for (UIButton *button in _buttons) {
+        CGFloat width = button.frame.size.width;
+        if (self.config.btnWidth > 0) {
+            width = self.config.btnWidth;
+        }
+        totalWidth += width;
+    }
+    
+    NSInteger totoalSpaceCount = _buttons.count - 1; // 俩俩按钮之间，总间距数
+    size.width = totalWidth + totoalSpaceCount * self.config.btnInterSpace;;
+    size.height = height + self.config.lineHeight;
+    
+    CGRect frame = self.frame;
+    frame.size = size;
+    self.frame = frame;
+}
+
+- (void)_buttonValueChanged:(UIButton *)sender {
+    if (sender == _selectedButton) {
+        _selectedButton = nil;
+        self.selectedButton = sender;
+    } else {
+        [sender sizeToFit];
+        [self setNeedsLayout];
+        [self layoutIfNeeded];
+    }
 }
 
 - (void)layout {
@@ -145,9 +198,14 @@
                 x += space + frame.size.width;
             }
             
+            CGFloat width = x;
+            
             // 按钮高度 + 线条高度
-            _scrollView.contentSize = CGSizeMake(x, self.config.btnHeight + self.config.lineHeight);
-            _scrollView.frame = CGRectMake((self.frame.size.width - _scrollView.contentSize.width) * 0.5, 0,
+            _scrollView.contentSize = CGSizeMake(width, self.config.btnHeight + self.config.lineHeight);
+            CGFloat _x = (self.frame.size.width - _scrollView.contentSize.width) * 0.5;;
+            if(_config.positionType == APSegmentedViewPositionTypeLeft)
+                _x = 0;
+            _scrollView.frame = CGRectMake(_x, 0,
                                            _scrollView.contentSize.width,
                                            _scrollView.contentSize.height);
             
@@ -161,8 +219,10 @@
                 x += frame.size.width + self.config.btnInterSpace; // 俩个button之间的最小距离为30
             }
             
+            CGFloat width = x - self.config.btnInterSpace;
+            
             // 按钮高度 + 线条高度
-            _scrollView.contentSize = CGSizeMake(x, self.config.btnHeight + self.config.lineHeight);
+            _scrollView.contentSize = CGSizeMake(width, self.config.btnHeight + self.config.lineHeight);
             _scrollView.frame = self.bounds;
         }
     }
@@ -171,12 +231,16 @@
 }
 
 - (void)buttonClicked:(UIButton *)sender {
+    [self buttonSelected:sender animated:YES];
+}
+
+- (void)buttonSelected:(UIButton *)sender animated:(BOOL)animated {
     if (sender == _selectedButton) {
         return;
     }
     
     // 将选中线条移动到该按钮下面
-    [UIView animateWithDuration:self.config.lineAnimationEnable?0.2:0 animations:^{
+    [UIView animateWithDuration:(self.config.lineAnimationEnable && animated) ? 0.25 : 0 animations:^{
         CGRect frame = self.selectedLineView.frame;
         if (self.config.lineWidth > 0) {
             frame.size.width = self.config.lineWidth;
@@ -330,8 +394,12 @@
 }
 
 - (void)setSelectedIndexChange:(NSInteger)selectedIndex {
+    [self setSelectedIndexChange:selectedIndex animated:YES];
+}
+
+- (void)setSelectedIndexChange:(NSInteger)selectedIndex animated:(BOOL)animated {
     _selectedIndex = selectedIndex;
-    [self buttonClicked:[self.buttons objectAtIndex:selectedIndex]];
+    [self buttonSelected:[self.buttons objectAtIndex:selectedIndex] animated:animated];
 }
 
 - (void)setSelectedButton:(UIButton *)selectedButton {
@@ -342,12 +410,13 @@
     // 上一个按钮恢复
     {
         _selectedButton.titleLabel.font = self.config.normalFont;
-        _selectedButton.enabled = YES;
         _selectedButton.selected = NO;
-        [_selectedButton sizeToFit];
-        CGRect frame = _selectedButton.frame;
-        frame.size.height = self.config.btnHeight;
-        _selectedButton.frame = frame;
+        if (self.config.btnWidth == 0) {
+            [_selectedButton sizeToFit];
+            CGRect frame = _selectedButton.frame;
+            frame.size.height = self.config.btnHeight;
+            _selectedButton.frame = frame;
+        }
     }
     
     
@@ -355,7 +424,6 @@
     {
         _selectedButton = selectedButton;
         _selectedButton.titleLabel.font = self.config.selectedFont ? : self.config.normalFont;
-        _selectedButton.enabled = NO;
         _selectedButton.selected = YES;
         
         ///如果按钮宽度自动缩放，因字体改变需要重新设置按钮的frame
@@ -413,3 +481,5 @@
 }
 
 @end
+
+

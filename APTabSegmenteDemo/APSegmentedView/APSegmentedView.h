@@ -13,6 +13,11 @@ typedef NS_ENUM(NSInteger, APSegmentedViewLineAnimationType) {
     APSegmentedViewLineAnimationTypeSlide = 1,          ///<滑动方式
 };
 
+typedef NS_ENUM(NSInteger, APSegmentedViewPositionType) {
+    APSegmentedViewPositionTypeLeft = 0,
+    APSegmentedViewPositionTypeCenter = 1,
+};
+
 @interface APSegmentedViewConfig : NSObject
 + (instancetype)defaultConfig;
 @property UIFont *normalFont;               ///<正常状态字体
@@ -26,6 +31,7 @@ typedef NS_ENUM(NSInteger, APSegmentedViewLineAnimationType) {
 @property CGFloat lineHeight;               ///<线条高度
 @property UIColor *lineColor;               ///<线条颜色
 @property BOOL lineAnimationEnable;         ///<线条动画（默认是YES）
+@property APSegmentedViewPositionType positionType; //按钮现实的位置（左对齐，居中对齐）
 ///线条动画类型 默认：APSegmentedViewLineAnimationTypeFlexible
 @property APSegmentedViewLineAnimationType lineAnimationType;
 @end
@@ -33,6 +39,7 @@ typedef NS_ENUM(NSInteger, APSegmentedViewLineAnimationType) {
 @interface APSegmentedView : UIView
 
 @property (nonatomic, assign, readonly) NSInteger selectedIndex;
+@property (nonatomic, strong, readonly) NSArray<UIButton *> *buttons;
 
 - (instancetype)init DEPRECATED_ATTRIBUTE;
 - (instancetype)initWithTabs:(NSArray<NSString *> *)tabs;
@@ -46,7 +53,9 @@ typedef NS_ENUM(NSInteger, APSegmentedViewLineAnimationType) {
  */
 - (void)buttonWillSelectedIndex:(NSInteger)index percent:(float)percent;
 - (void)setSelectedIndexChange:(NSInteger)selectedIndex;
+- (void)setSelectedIndexChange:(NSInteger)selectedIndex animated:(BOOL)animated;
 
 @property (nonatomic, copy) void (^onSelectedIndexChanged)(NSInteger index);
 
 @end
+
